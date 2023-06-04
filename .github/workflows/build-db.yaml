@@ -1,0 +1,39 @@
+name: builddb
+run-name: build jdk8 codeql db
+on:
+  schedule:
+    - cron: '0 0 31 * *'
+
+env:
+  ACTIONS_STEP_DEBUG: true
+
+jobs:
+
+  checkout-jdk8-src:
+    runs-on: ubuntu-22.04
+    container: ubuntu:18.04
+    permissions:
+      security-events: write
+    steps:
+      - name: Install deps
+        run: apt update && apt install -y wget git gcc g++ make file unzip zip libx11-dev libxext-dev libxrender-dev libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev libfontconfig1-dev
+      - name: Clone bootstrap jdk
+        uses: actions/checkout@v1
+      - name: Tar files
+        run: tar zxf jdk-7u1-linux-x64.tar.gz
+      - name: Clone jdk8 src
+        run: git clone --depth=1 https://github.com/openjdk/jdk8u
+      - name: configure
+        run: export JAVA_HOME=$(pwd)/jdk1.7.0_01 && echo $JAVA_HOME && cd jdk8u && bash ./configure --with-boot-jdk=${JAVA_HOME} && cd -
+      - name: Initialize CodeQL
+        run: |
+          wget https://github.com/github/codeql-cli-binaries/releases/download/v2.13.3/codeql-linux64.zip && 
+          ls -lh &&
+          unzip codeql-linux64.zip && ls -lh codeql
+      - name: Create codeql db
+        run: codeql/codeql database create jdk8db --language=java --source-root jdk8u --command='make all'
+      - name: Upload db
+        uses: actions/upload-artifact@v3
+        with:
+          name: jdk8db
+          path: jdk8db
